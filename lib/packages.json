@@ -1,0 +1,155 @@
+[
+  {
+    "id": "pkg-001",
+    "slug": "tint-front-only",
+    "name": "Front Doors Only",
+    "category": "Window Tinting",
+    "description": "Two front doors matched to your factory rear tint. The quick fix for glare and heat where you sit.",
+    "price": 12000,
+    "originalPrice": null,
+    "duration": "2 hours",
+    "features": [
+      "Nano-ceramic film",
+      "UV 99% rejection",
+      "Legal VLT",
+      "Lifetime warranty"
+    ],
+    "popular": false
+  },
+  {
+    "id": "pkg-002",
+    "slug": "tint-standard",
+    "name": "Standard Tint Package",
+    "category": "Window Tinting",
+    "description": "All five windows with our premium dyed-ceramic film. Great heat rejection at a friendly price.",
+    "price": 25000,
+    "originalPrice": 30000,
+    "duration": "4 hours",
+    "features": [
+      "5 windows",
+      "Nano-ceramic film",
+      "UV 99% rejection",
+      "Lifetime warranty"
+    ],
+    "popular": false
+  },
+  {
+    "id": "pkg-003",
+    "slug": "tint-premium",
+    "name": "Premium Ceramic Tint",
+    "category": "Window Tinting",
+    "description": "Top-tier nano-ceramic across all glass including the windshield strip. Maximum heat rejection, crystal clarity.",
+    "price": 38000,
+    "originalPrice": 45000,
+    "duration": "5 hours",
+    "features": [
+      "All glass + windshield strip",
+      "Up to 85% heat rejection",
+      "Signal-safe ceramic",
+      "Lifetime warranty"
+    ],
+    "popular": true
+  },
+  {
+    "id": "pkg-004",
+    "slug": "ppf-front-end",
+    "name": "PPF Front-End Kit",
+    "category": "Paint Protection",
+    "description": "Full bumper, bonnet leading edge, mirrors and headlamps. Protects where the stone chips actually happen.",
+    "price": 45000,
+    "originalPrice": null,
+    "duration": "2 days",
+    "features": [
+      "Full bumper",
+      "Bonnet edge",
+      "Mirrors & lamps",
+      "Self-healing film"
+    ],
+    "popular": false
+  },
+  {
+    "id": "pkg-005",
+    "slug": "ppf-full-front",
+    "name": "PPF Full Front End",
+    "category": "Paint Protection",
+    "description": "Full bonnet, full bumper, full fenders, mirrors and lamps. The serious choice for highway drivers.",
+    "price": 85000,
+    "originalPrice": 98000,
+    "duration": "3 days",
+    "features": [
+      "Full bonnet & fenders",
+      "Full bumper",
+      "Hydrophobic top coat",
+      "5-year warranty"
+    ],
+    "popular": true
+  },
+  {
+    "id": "pkg-006",
+    "slug": "ppf-full-body",
+    "name": "PPF Full Body",
+    "category": "Paint Protection",
+    "description": "Every painted panel wrapped in self-healing film. Your paint stays factory-fresh for years.",
+    "price": 220000,
+    "originalPrice": null,
+    "duration": "4–5 days",
+    "features": [
+      "Every painted panel",
+      "Self-healing film",
+      "Hydrophobic finish",
+      "5-year warranty"
+    ],
+    "popular": false
+  },
+  {
+    "id": "pkg-007",
+    "slug": "express-detail",
+    "name": "Express Detail",
+    "category": "Detailing",
+    "description": "In and out wash, clay bar, interior deep clean and tyre dressing. Perfect before a weekend show.",
+    "price": 8000,
+    "originalPrice": null,
+    "duration": "3 hours",
+    "features": [
+      "Hand wash & clay bar",
+      "Interior deep clean",
+      "Tyre & trim dressing",
+      "Glass polish"
+    ],
+    "popular": false
+  },
+  {
+    "id": "pkg-008",
+    "slug": "full-detail",
+    "name": "Full Detail & Paint Correction",
+    "category": "Detailing",
+    "description": "Machine polish to remove swirls and light scratches, then seal with a premium paint sealant.",
+    "price": 18000,
+    "originalPrice": 22000,
+    "duration": "1–2 days",
+    "features": [
+      "Two-stage machine polish",
+      "Swirl & scratch removal",
+      "Paint sealant",
+      "Engine bay detail"
+    ],
+    "popular": false
+  },
+  {
+    "id": "pkg-009",
+    "slug": "ceramic-coating",
+    "name": "9H Ceramic Coating",
+    "category": "Detailing",
+    "description": "A glass-like ceramic shield over corrected paint. Deep gloss, extreme water beading, easy washing.",
+    "price": 45000,
+    "originalPrice": 55000,
+    "duration": "2–3 days",
+    "features": [
+      "9H hardness",
+      "3–5 year durability",
+      "Extreme gloss",
+      "Hydrophobic finish"
+    ],
+    "popular": true
+  }
+]

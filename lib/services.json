@@ -1,0 +1,117 @@
+
+[ 
+  {
+    "id": "svc-001",
+    "slug": "vehicle-imports",
+    "title": "Vehicle Imports",
+    "tagline": "Source. Ship. Clear. Deliver.",
+    "description": "We import your dream car to your exact spec from Japan, UK, Dubai and Thailand. From auction bidding to customs clearance at Mombasa and delivery to your doorstep in Nairobi, we handle every step — with transparent pricing and weekly photo updates.",
+    "image": "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=1200&q=80",
+    "icon": "Ship",
+    "features": [
+      "Auction sourcing from Japan, UK & UAE",
+      "Full customs clearance at Mombasa",
+      "Duty calculation & IDP handling",
+      "Pre-shipment inspection reports",
+      "Doorstep delivery countrywide",
+      "Weekly progress photo updates"
+    ],
+    "priceFrom": 250000,
+    "duration": "6–10 weeks"
+  },
+  {
+    "id": "svc-002",
+    "slug": "car-sales",
+    "title": "Car Sales",
+    "tagline": "Quality cars, honestly priced.",
+    "description": "Hand-picked local, imported and foreign-used vehicles, each inspected on our lift before listing. Every car comes with verified mileage, accident history and honest advice on running costs. Trade-ins welcome.",
+    "image": "https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=1200&q=80",
+    "icon": "CarFront",
+    "features": [
+      "Inspected inventory — lift checked",
+      "Verified mileage & accident history",
+      "Trade-in valuation & exchange",
+      "Flexible payment plans",
+      "Transfer & registration support",
+      "After-sale servicing discount"
+    ],
+    "priceFrom": null,
+    "duration": null
+  },
+  {
+    "id": "svc-003",
+    "slug": "custom-styling",
+    "title": "Custom Styling",
+    "tagline": "Your car, your signature.",
+    "description": "Body kits, suspension drops, alloy swaps, ambient lighting, exhaust systems and full restomod builds. If you can dream it, our workshop on Mombasa Road can build it — with proper fitment, no shortcuts.",
+    "image": "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&w=1200&q=80",
+    "icon": "Wrench",
+    "features": [
+      "Body kits & lip spoilers",
+      "Suspension lowering & air ride",
+      "Aftermarket exhaust systems",
+      "Alloy wheel supply & fitment",
+      "Interior retrim & ambient lighting",
+      "Head unit & audio upgrades"
+    ],
+    "priceFrom": 35000,
+    "duration": "1–3 weeks"
+  },
+  {
+    "id": "svc-004",
+    "slug": "vinyl-wraps",
+    "title": "Vinyl Wraps",
+    "tagline": "Any colour you can imagine.",
+    "description": "Full and partial colour-change wraps in gloss, satin, matte, chrome and colour-shift finishes. We use premium cast vinyls with plotter-cut precision, wrapped in our dust-controlled bay. Fully reversible and paint-safe.",
+    "image": "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=1200&q=80",
+    "icon": "Palette",
+    "features": [
+      "Full colour-change wraps",
+      "Satin, matte, gloss & chrome finishes",
+      "Colour-shift / flip-flop vinyls",
+      "Chrome delete & blackout packs",
+      "Commercial branding wraps",
+      "Removal & restoration service"
+    ],
+    "priceFrom": 95000,
+    "duration": "3–5 days"
+  },
+  {
+    "id": "svc-005",
+    "slug": "ppf",
+    "title": "PPF — Paint Protection Film",
+    "tagline": "Invisible armour for your paint.",
+    "description": "Self-healing, stone-chip-proof urethane film that keeps your paint factory-fresh. From a front-end kit to a full-body wrap, we offer both standard and top-tier hydrophobic films with a workmanship guarantee.",
+    "image": "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=1200&q=80",
+    "icon": "Shield",
+    "features": [
+      "Self-healing urethane film",
+      "Front-end & full-body kits",
+      "Hydrophobic top-coat options",
+      "Matte-film for gloss paint",
+      "Computer-cut patterns",
+      "5-year workmanship warranty"
+    ],
+    "priceFrom": 45000,
+    "duration": "2–4 days"
+  },
+  {
+    "id": "svc-006",
+    "slug": "window-tinting",
+    "title": "Window Tinting",
+    "tagline": "Cool, private, protected.",
+    "description": "Premium nano-ceramic films that cut heat and UV while keeping you on the right side of the law. We tint to legal visible-light-transmission levels and give every install a lifetime no-bubble warranty.",
+    "image": "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=1200&q=80",
+    "icon": "Sun",
+    "features": [
+      "Nano-ceramic heat rejection",
+      "99% UV protection",
+      "Legal VLT compliance",
+      "Lifetime no-bubble warranty",
+      "Windshield clear-film options",
+      "Same-day installation"
+    ],
+    "priceFrom": 12000,
+    "duration": "3–5 hours"
+  }
+]

@@ -1,26 +1,141 @@
+/* app/globals.css: Monara Auto Studio */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Background & Foreground (light, warm base so the site is NOT all black) */
+  --color-background: hsl(40 33% 97%);
+  --color-foreground: hsl(270 40% 8%);
+
+  /* Card Colors */
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(270 40% 8%);
+
+  /* Primary Colors: GOLD */
+  --color-primary: hsl(44 100% 48%);
+  --color-primary-light: hsl(46 100% 65%);
+  --color-primary-dark: hsl(43 89% 38%);
+  --color-primary-foreground: hsl(270 40% 8%);
+
+  /* Secondary Colors: PURPLE */
+  --color-secondary: hsl(271 76% 53%);
+  --color-secondary-light: hsl(271 76% 63%);
+  --color-secondary-dark: hsl(271 76% 38%);
+  --color-secondary-foreground: hsl(0 0% 100%);
+
+  /* Accent Colors: MAGENTA */
+  --color-accent: hsl(329 82% 52%);
+  --color-accent-light: hsl(329 82% 62%);
+  --color-accent-dark: hsl(329 82% 40%);
+  --color-accent-foreground: hsl(0 0% 100%);
+
+  /* Muted Colors */
+  --color-muted: hsl(40 20% 92%);
+  --color-muted-foreground: hsl(270 10% 40%);
+
+  /* Dark Section Colors (for Hero, Footer, CTA banners only) */
+  --color-dark: hsl(270 50% 5%);
+  --color-dark-light: hsl(270 35% 10%);
+  --color-dark-card: hsl(270 30% 14%);
+  --color-dark-foreground: hsl(0 0% 100%);
+  --color-dark-muted: hsl(270 8% 65%);
+
+  /* Destructive Colors */
+  --color-destructive: hsl(0 84% 60%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+
+  /* Border & Input */
+  --color-border: hsl(40 15% 87%);
+  --color-input: hsl(40 15% 87%);
+
+  /* Ring (focus) */
+  --color-ring: hsl(44 100% 48%);
+
+  /* WhatsApp Colors */
+  --color-whatsapp: hsl(142 70% 40%);
+  --color-whatsapp-light: hsl(142 70% 50%);
+  --color-whatsapp-dark: hsl(142 70% 30%);
+  --color-whatsapp-foreground: hsl(0 0% 100%);
+
+  /* Border Radius */
+  --radius-default: 0.75rem;
+
+  /* Font Family */
+  --font-sans: 'Inter', sans-serif;
+  --font-heading: 'Orbitron', sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Base styles */
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
+  letter-spacing: 0.02em;
+}
+
+::selection {
+  background-color: var(--color-primary);
+  color: var(--color-primary-foreground);
+}
+
+/* Text balance utility */
+.text-balance {
+  text-wrap: balance;
+}
+
+/* ---------- Brand gradients & effects ---------- */
+
+/* Gold gradient background (primary buttons) */
+@utility bg-gold-gradient {
+  background-image: linear-gradient(135deg, #ffd84d, #f5b800 50%, #b8860b);
+}
+
+/* Gold to magenta to purple (lines, borders, accents) */
+@utility bg-brand-gradient {
+  background-image: linear-gradient(90deg, #f5b800, #e91e8c, #8a2be2);
+}
+
+/* Deep purple hero/footer background */
+@utility bg-dark-gradient {
+  background-image: linear-gradient(160deg, #0d0612 0%, #1a0b2e 55%, #2a0f45 100%);
+}
+
+/* Gradient text (gold) */
+@utility text-gold-gradient {
+  background-image: linear-gradient(135deg, #ffd84d, #f5b800 50%, #b8860b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Gradient text (brand) */
+@utility text-brand-gradient {
+  background-image: linear-gradient(90deg, #f5b800, #e91e8c, #8a2be2);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Soft glows for hover states */
+@utility glow-gold {
+  box-shadow: 0 0 30px rgba(245, 184, 0, 0.25);
+}
+
+@utility glow-purple {
+  box-shadow: 0 0 30px rgba(138, 43, 226, 0.25);
 }
