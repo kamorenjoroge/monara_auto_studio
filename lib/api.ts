@@ -1,21 +1,42 @@
-// DATA LAYER: the only place that reads data.
-// Pages and components call these functions and never import JSON directly.
-// Later we replace the bodies with Supabase calls (same function names and types).
+import { cacheLife, cacheTag } from "next/cache";
+import { createClient } from "@supabase/supabase-js";
 
-import services from "@/lib/services.json"
-import cars from "@/lib/cars.json"
-import gallery from "@/lib/gallery.json"
-import products from "@/lib/products.json"
-import packages from "@/lib/packages.json"
-import type { Car, GalleryItem, Package, Product, Service  } from "./types";
+import cars from "./cars.json";
+import { rowToPackage } from "./packagesDb";
+import { rowToGalleryItem } from "./galleryDb";
+import { rowToProduct } from "./productsDb";
+import { rowToService } from "./servicesDb";
+import type { Car, GalleryItem, Package, Product, Service } from "./types";
 
+// ============================================================
+// THE DATA LAYER for the PUBLIC website.
+// Pages call these functions to get data; they never read JSON or Supabase directly.
+//   - Services, Products and Gallery come from Supabase (remembered for about a minute).
+//   - Cars and Packages still come from the sample JSON files. We convert them next.
+// ============================================================
 
-// DATA LAYER: pages call these functions to get data.
-// Right now they read the mock JSON. Later we change ONLY the inside of
-// each function to read from Supabase, and nothing else in the app changes.
+// A connection that only uses the public key (it can read only what the database rules allow)
+function publicClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    { auth: { persistSession: false } },
+  );
+}
 
+// ---------- Services (read from Supabase, remembered for a minute) ----------
 export async function getServices(): Promise<Service[]> {
-  return services as unknown as Service[];
+  "use cache";
+  cacheLife("minutes");
+  cacheTag("services");
+
+  const { data, error } = await publicClient()
+    .from("services")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error || !data) return [];
+  return data.map(rowToService);
 }
 
 export async function getServiceBySlug(slug: string): Promise<Service | undefined> {
@@ -23,10 +44,61 @@ export async function getServiceBySlug(slug: string): Promise<Service | undefine
   return all.find((service) => service.slug === slug);
 }
 
-// ---------- Cars ----------
+// ---------- Products (read from Supabase, remembered for a minute) ----------
+export async function getProducts(): Promise<Product[]> {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag("products");
+
+  const { data, error } = await publicClient()
+    .from("products")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error || !data) return [];
+  return data.map(rowToProduct);
+}
+
+// ---------- Gallery (read from Supabase, remembered for a minute) ----------
+export async function getGallery(): Promise<GalleryItem[]> {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag("gallery");
+
+  const { data, error } = await publicClient()
+    .from("gallery")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error || !data) return [];
+  return data.map(rowToGalleryItem);
+}
+
+// ---------- Packages (read from Supabase, remembered for a minute) ----------
+export async function getPackages(): Promise<Package[]> {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag("packages");
+
+  const { data, error } = await publicClient()
+    .from("packages")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error || !data) return [];
+  return data.map(rowToPackage);
+}
+
+// ---------- Cars (still the sample JSON file) ----------
 export async function getCars(): Promise<Car[]> {
   return cars as unknown as Car[];
 }
+
+export async function getFeaturedCars(): Promise<Car[]> {
+  const all = await getCars();
+  return all.filter((car) => car.featured);
+}
+
 export async function getCarBySlug(slug: string): Promise<Car | undefined> {
   const all = await getCars();
   return all.find((car) => car.slug === slug);
@@ -42,22 +114,4 @@ export async function getSimilarCars(car: Car, limit = 3): Promise<Car[]> {
         (other.bodyType === car.bodyType || other.make === car.make),
     )
     .slice(0, limit);
-}
-
-// ---------- Gallery ----------
-export async function getGallery(): Promise<GalleryItem[]> {
-  return gallery as unknown as GalleryItem[];
-}
-
-// ---------- Products ----------
-export async function getProducts(): Promise<Product[]> {
-  return products as unknown as Product[];
-}
-// ---------- Packages ----------
-export async function getPackages(): Promise<Package[]> {
-  return packages as unknown as Package[];
-}
-export async function getFeaturedCars(): Promise<Car[]> {
-  const all = await getCars();
-  return all.filter((car) => car.featured);
 }

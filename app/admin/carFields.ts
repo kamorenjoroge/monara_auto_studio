@@ -30,8 +30,9 @@ export function getCarFields(isAdmin: boolean): FieldConfig[] {
       name: "images",
       label: "Photos",
       type: "images",
+      folder: "cars",
       required: true,
-      help: "Paste a link to a photo and press Add. The first photo is the cover. (Real uploads come with Cloudinary later.)",
+      help: "Choose one or more photos from your device. The first one is the cover. JPG, PNG or WebP, up to 10 MB each.",
     },
     {
       name: "features",

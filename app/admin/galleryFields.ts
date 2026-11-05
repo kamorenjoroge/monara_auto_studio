@@ -9,15 +9,15 @@ export function getGalleryFields(): FieldConfig[] {
   return [
     { name: "title", label: "Title", type: "text", required: true, placeholder: "e.g. Land Cruiser V8: Full PPF", wide: true },
     { name: "category", label: "Category", type: "select", options: CATEGORY_OPTIONS, help: "The visitor's filter buttons use this." },
-    {
-      name: "image",
-      label: "Photo link",
-      type: "text",
-      required: true,
-      placeholder: "https://... (link to a photo)",
-      help: "Paste a link to a photo. (Real uploads come with Cloudinary later.)",
-      wide: true,
-    },
+   {
+  name: "image",
+  label: "Photo",
+  type: "image",
+  folder: "gallery",
+  required: true,
+  help: "Choose a photo from your device. JPG, PNG or WebP, up to 10 MB.",
+  wide: true,
+},
     {
       name: "description",
       label: "Short description",

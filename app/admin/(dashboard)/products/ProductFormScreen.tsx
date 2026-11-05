@@ -1,17 +1,17 @@
 'use client';
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft } from "lucide-react";
 
-import { productsStore } from "@/lib/adminStore";
-import type { Product } from "@/lib/types";
-import { useLocalStore } from "../../useLocalStore";
+import { refreshPublic } from "@/lib/refresh";
+import { createProduct, fetchProducts, updateProduct } from "@/lib/productsDb";
+import { useSupabaseList } from "../../useSupabaseList";
 import AdminPageHeader from "../../AdminPageHeader";
 import EntityForm, { type FormValues } from "../../EntityForm";
 import RoleGuard from "../../RoleGuard";
 import {
-  getEmptyProductValues,
   getProductFields,
   productToFormValues,
   productValuesToFields,
@@ -40,7 +40,8 @@ export default function ProductFormScreen({ productId }: ProductFormScreenProps)
 
 function ProductFormContent({ productId }: ProductFormScreenProps) {
   const router = useRouter();
-  const { items: products, loading, add, update } = useLocalStore(productsStore);
+  const { supabase, items: products, loading, error: loadError } = useSupabaseList(fetchProducts);
+  const [error, setError] = useState("");
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
@@ -51,7 +52,9 @@ function ProductFormContent({ productId }: ProductFormScreenProps) {
   if (isEdit && !product) {
     return (
       <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-10 text-center">
-        <p className="text-foreground">This product was not found. It may have been deleted.</p>
+        <p className="text-foreground">
+          {loadError || "This product was not found. It may have been deleted."}
+        </p>
         <Link
           href="/admin/products"
           className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-secondary hover:underline"
@@ -63,23 +66,31 @@ function ProductFormContent({ productId }: ProductFormScreenProps) {
     );
   }
 
-  // Runs when the form is valid
-  const handleSubmit = (values: FormValues) => {
+  // Runs when the form is valid and its photo is uploaded: save to the database
+  const handleSubmit = async (values: FormValues) => {
+    setError("");
     const fields = productValuesToFields(values);
+    let message: string | null;
 
     if (product) {
-      // EDIT: change the fields (the web address piece stays the same)
-      update(product.id, fields);
+      // EDIT (the web address piece stays the same)
+      message = await updateProduct(supabase, product.id, fields);
     } else {
-      // ADD: make a new product with its own id and web address piece
+      // ADD: make a web address piece from the name, and make sure it is not taken
       let slug = slugify(fields.name);
       if (products.some((item) => item.slug === slug)) {
         slug = `${slug}-${Date.now().toString().slice(-4)}`;
       }
-      const newProduct: Product = { id: `prd-${Date.now()}`, slug, ...fields };
-      add(newProduct);
+      message = await createProduct(supabase, slug, fields);
     }
 
+    if (message) {
+      setError(message);
+      window.scrollTo({ top: 0, behavior: "smooth" }); // so the message is seen
+      return;
+    }
+
+    await refreshPublic("products"); // the public Shop shows the change straight away
     router.push("/admin/products");
   };
 
@@ -98,7 +109,14 @@ function ProductFormContent({ productId }: ProductFormScreenProps) {
         description={product ? product.name : "An accessory or spare part customers can order."}
       />
 
-      {/* key makes the form start fresh for each product */}
+      {error && (
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-foreground">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          {error}
+        </div>
+      )}
+
+      {/* key makes the form start fresh for each product 
       <EntityForm
         key={product?.id ?? "new"}
         fields={getProductFields()}
@@ -107,6 +125,7 @@ function ProductFormContent({ productId }: ProductFormScreenProps) {
         cancelHref="/admin/products"
         onSubmit={handleSubmit}
       />
+      */}
     </div>
   );
 }

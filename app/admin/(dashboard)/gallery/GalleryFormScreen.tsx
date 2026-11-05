@@ -1,12 +1,13 @@
 'use client';
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft } from "lucide-react";
 
-import { galleryStore } from "@/lib/adminStore";
-import type { GalleryItem } from "@/lib/types";
-import { useLocalStore } from "../../useLocalStore";
+import { refreshPublic } from "@/lib/refresh";
+import { createGalleryItem, fetchGallery, updateGalleryItem } from "@/lib/galleryDb";
+import { useSupabaseList } from "../../useSupabaseList";
 import AdminPageHeader from "../../AdminPageHeader";
 import EntityForm, { type FormValues } from "../../EntityForm";
 import RoleGuard from "../../RoleGuard";
@@ -33,7 +34,8 @@ export default function GalleryFormScreen({ itemId }: GalleryFormScreenProps) {
 
 function GalleryFormContent({ itemId }: GalleryFormScreenProps) {
   const router = useRouter();
-  const { items, loading, add, update } = useLocalStore(galleryStore);
+  const { supabase, items, loading, error: loadError } = useSupabaseList(fetchGallery);
+  const [error, setError] = useState("");
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
@@ -44,7 +46,9 @@ function GalleryFormContent({ itemId }: GalleryFormScreenProps) {
   if (isEdit && !item) {
     return (
       <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-10 text-center">
-        <p className="text-foreground">This photo was not found. It may have been deleted.</p>
+        <p className="text-foreground">
+          {loadError || "This photo was not found. It may have been deleted."}
+        </p>
         <Link
           href="/admin/gallery"
           className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-secondary hover:underline"
@@ -56,17 +60,22 @@ function GalleryFormContent({ itemId }: GalleryFormScreenProps) {
     );
   }
 
-  // Runs when the form is valid
-  const handleSubmit = (values: FormValues) => {
+  // Runs when the form is valid and its photo is uploaded: save to the database
+  const handleSubmit = async (values: FormValues) => {
+    setError("");
     const fields = galleryValuesToFields(values);
 
-    if (item) {
-      update(item.id, fields); // EDIT
-    } else {
-      const newItem: GalleryItem = { id: `gal-${Date.now()}`, ...fields }; // ADD
-      add(newItem);
+    const message = item
+      ? await updateGalleryItem(supabase, item.id, fields)
+      : await createGalleryItem(supabase, fields);
+
+    if (message) {
+      setError(message);
+      window.scrollTo({ top: 0, behavior: "smooth" }); // so the message is seen
+      return;
     }
 
+    await refreshPublic("gallery"); // the public Gallery shows the change straight away
     router.push("/admin/gallery");
   };
 
@@ -84,6 +93,13 @@ function GalleryFormContent({ itemId }: GalleryFormScreenProps) {
         title={isEdit ? "Edit photo" : "Add photo"}
         description={item ? item.title : "A photo of the work that leaves your workshop."}
       />
+
+      {error && (
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-foreground">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          {error}
+        </div>
+      )}
 
       {/* key makes the form start fresh for each photo */}
       <EntityForm

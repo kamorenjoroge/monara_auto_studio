@@ -9,15 +9,15 @@ export function getProductFields(): FieldConfig[] {
     { name: "category", label: "Category", type: "select", options: ["Accessories", "Spare Parts"] },
     { name: "price", label: "Price (KES)", type: "number", required: true, min: 1, placeholder: "e.g. 18500" },
     { name: "rating", label: "Rating (0 to 5)", type: "number", required: true, min: 0, max: 5, help: "Shown as a star rating on the product card." },
-    {
-      name: "image",
-      label: "Photo link",
-      type: "text",
-      required: true,
-      placeholder: "https://... (link to a photo)",
-      help: "Paste a link to a photo. (Real uploads come with Cloudinary later.)",
-      wide: true,
-    },
+   {
+  name: "image",
+  label: "Photo",
+  type: "image",
+  folder: "products",
+  required: true,
+  help: "Choose a photo from your device. JPG, PNG or WebP, up to 10 MB.",
+  wide: true,
+},
     {
       name: "description",
       label: "Description",
@@ -29,19 +29,7 @@ export function getProductFields(): FieldConfig[] {
   ];
 }
 
-// What the form looks like before anything is typed (for "Add product")
-export function getEmptyProductValues(): FormValues {
-  return {
-    name: "",
-    brand: "",
-    category: "Accessories",
-    price: "",
-    rating: "4.5",
-    image: "",
-    description: "",
-    inStock: true,
-  };
-}
+
 
 // A saved product → the values to put in the form (for "Edit product")
 export function productToFormValues(product: Product): FormValues {

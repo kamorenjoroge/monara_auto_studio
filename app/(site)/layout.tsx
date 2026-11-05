@@ -4,6 +4,7 @@ import { getSiteData } from "@/lib/getSite";
 import NavBar from "./components/NavBar";
 import Footer from "./components/Footer";
 import { SiteProvider } from "./components/SiteProvider";
+export const instant = false;
 
 // The layout for the PUBLIC website: it reads the settings once, shares them with every
 // client component through SiteProvider, and draws the NavBar and Footer.

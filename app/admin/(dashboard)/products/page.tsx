@@ -3,12 +3,17 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Pencil, RotateCcw, Search, Star, Trash2 } from "lucide-react";
+import { AlertCircle, Database, Pencil, Search, Star, Trash2 } from "lucide-react";
 
-import { productsStore } from "@/lib/adminStore";
+import { refreshPublic } from "@/lib/refresh";
+import {
+  deleteProduct,
+  fetchProducts,
+  setProductStock,
+} from "@/lib/productsDb";
 import { formatKES } from "@/lib/types";
 import type { Product } from "@/lib/types";
-import { useLocalStore } from "../../useLocalStore";
+import { useSupabaseList } from "../../useSupabaseList";
 import AdminPageHeader from "../../AdminPageHeader";
 import ConfirmDialog from "../../ConfirmDialog";
 import DataTable, { type Column } from "../../DataTable";
@@ -18,7 +23,8 @@ const selectClass =
   "rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/40";
 
 // Save this file as app/admin/(dashboard)/products/page.tsx
-// The whole page is wrapped in RoleGuard, so only the admin can open it.
+// The whole page is wrapped in RoleGuard, so only the admin sees it.
+// (The real protection is in the database: only the admin may change products.)
 export default function AdminProductsPage() {
   return (
     <RoleGuard roles={["admin"]}>
@@ -28,7 +34,7 @@ export default function AdminProductsPage() {
 }
 
 function ProductsContent() {
-  const { items: products, loading, update, remove, reset } = useLocalStore(productsStore);
+  const { supabase, items: products, loading, error: loadError, reload } = useSupabaseList(fetchProducts);
 
   // What the admin typed or picked in the filters
   const [search, setSearch] = useState("");
@@ -36,13 +42,36 @@ function ProductsContent() {
 
   // The product waiting for "Are you sure?" (null = no pop-up)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [message, setMessage] = useState("");
+  const [importing, setImporting] = useState(false);
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
-  // Apply the search and the category filter
+  // After any change: clear the website's memory and read the list again
+  const finish = async (problem: string | null) => {
+    if (problem) {
+      setMessage(problem);
+      return;
+    }
+    setMessage("");
+    await refreshPublic("products");
+    await reload();
+  };
+
+  const handleDelete = async () => {
+    if (!productToDelete) return;
+    const problem = await deleteProduct(supabase, productToDelete.id);
+    setProductToDelete(null);
+    await finish(problem);
+  };
+
+  const handleStock = async (product: Product) => {
+    await finish(await setProductStock(supabase, product.id, !product.inStock));
+  };
+
+  // Newest first, then apply the search and the category filter
   const query = search.trim().toLowerCase();
-  const visibleProducts = products.filter((product) => {
+  const visibleProducts = [...products].reverse().filter((product) => {
     if (query && !`${product.name} ${product.brand}`.toLowerCase().includes(query)) return false;
     if (categoryFilter !== "all" && product.category !== categoryFilter) return false;
     return true;
@@ -115,6 +144,8 @@ function ProductsContent() {
     },
   ];
 
+  const errorText = message || loadError;
+
   return (
     <div className="space-y-8">
       <AdminPageHeader
@@ -124,107 +155,108 @@ function ProductsContent() {
         actionHref="/admin/products/new"
       />
 
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or brand..."
-              className="w-full rounded-lg border border-border bg-white py-2.5 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/40"
-            />
-          </div>
-
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className={selectClass}
-            aria-label="Filter by category"
-          >
-            <option value="all">All categories</option>
-            <option value="Accessories">Accessories</option>
-            <option value="Spare Parts">Spare Parts</option>
-          </select>
+      {errorText && (
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-foreground">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          {errorText}
         </div>
+      )}
 
-        <p className="text-sm text-muted-foreground">
-          <span className="font-bold text-foreground">{visibleProducts.length}</span>{" "}
-          {visibleProducts.length === 1 ? "product" : "products"} shown
-          {outOfStock > 0 && ` · ${outOfStock} out of stock`}
-        </p>
+      {/* An empty database: offer to copy the sample products from products.json 
+      {products.length === 0 && !loadError && (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
+          <Database className="mx-auto h-10 w-10 text-muted-foreground" />
+          <p className="mt-3 text-sm text-foreground">The database has no products yet.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Copy the sample products from products.json, or add your own with the button above.
+          </p>
 
-        <DataTable
-          columns={columns}
-          rows={visibleProducts}
-          emptyMessage="No products match your search."
-          actions={(product) => (
-            <div className="flex items-center justify-end gap-4">
-              {/* A quick way to change the stock without opening the form */}
-              <button
-                onClick={() => update(product.id, { inStock: !product.inStock })}
-                className="text-sm font-semibold text-secondary hover:underline"
-              >
-                {product.inStock ? "Mark out of stock" : "Mark in stock"}
-              </button>
-
-              <Link
-                href={`/admin/products/${product.id}/edit`}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-secondary hover:underline"
-              >
-                <Pencil className="h-4 w-4" />
-                Edit
-              </Link>
-
-              <button
-                onClick={() => setProductToDelete(product)}
-                aria-label={`Delete ${product.name}`}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-destructive hover:underline"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </button>
-            </div>
-          )}
-        />
-
-        {/* Demo helper: bring the sample products back */}
-        <div className="pt-2">
           <button
-            onClick={() => setConfirmReset(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+            onClick={handleImport}
+            disabled={importing}
+            className="mt-5 rounded-xl bg-gold-gradient px-6 py-2.5 text-sm font-semibold text-primary-foreground transition hover:glow-gold disabled:opacity-60"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reset demo data
+            {importing ? "Importing..." : "Import the sample products"}
           </button>
         </div>
-      </section>
+      )}  */}
+
+      {products.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name or brand..."
+                className="w-full rounded-lg border border-border bg-white py-2.5 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/40"
+              />
+            </div>
+
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className={selectClass}
+              aria-label="Filter by category"
+            >
+              <option value="all">All categories</option>
+              <option value="Accessories">Accessories</option>
+              <option value="Spare Parts">Spare Parts</option>
+            </select>
+          </div>
+
+          <p className="text-sm text-muted-foreground">
+            <span className="font-bold text-foreground">{visibleProducts.length}</span>{" "}
+            {visibleProducts.length === 1 ? "product" : "products"} shown
+            {outOfStock > 0 && ` · ${outOfStock} out of stock`}
+          </p>
+
+          <DataTable
+            columns={columns}
+            rows={visibleProducts}
+            emptyMessage="No products match your search."
+            actions={(product) => (
+              <div className="flex items-center justify-end gap-4">
+                {/* A quick way to change the stock without opening the form */}
+                <button
+                  onClick={() => handleStock(product)}
+                  className="text-sm font-semibold text-secondary hover:underline"
+                >
+                  {product.inStock ? "Mark out of stock" : "Mark in stock"}
+                </button>
+
+                <Link
+                  href={`/admin/products/${product.id}/edit`}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-secondary hover:underline"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </Link>
+
+                <button
+                  onClick={() => setProductToDelete(product)}
+                  aria-label={`Delete ${product.name}`}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-destructive hover:underline"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </button>
+              </div>
+            )}
+          />
+        </section>
+      )}
 
       {/* "Are you sure?" pop-up for delete */}
       <ConfirmDialog
         open={productToDelete !== null}
         title="Delete this product?"
-        message={`"${productToDelete?.name ?? ""}" will be removed. This cannot be undone.`}
+        message={`"${productToDelete?.name ?? ""}" will be removed from the Shop. This cannot be undone.`}
         confirmLabel="Delete"
         onCancel={() => setProductToDelete(null)}
-        onConfirm={() => {
-          if (productToDelete) remove(productToDelete.id);
-          setProductToDelete(null);
-        }}
-      />
-
-      {/* "Are you sure?" pop-up for reset */}
-      <ConfirmDialog
-        open={confirmReset}
-        title="Reset demo data?"
-        message="All products you added, edited or deleted here will be replaced by the original sample products."
-        confirmLabel="Reset"
-        onCancel={() => setConfirmReset(false)}
-        onConfirm={() => {
-          reset();
-          setConfirmReset(false);
-        }}
+        onConfirm={handleDelete}
       />
     </div>
   );
