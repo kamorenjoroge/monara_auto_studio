@@ -1,4 +1,5 @@
-import type { Seller } from "@/lib/adminStore";
+import type { SellerAccount } from "@/lib/sellersDb";
+import type { SellerInput } from "@/lib/sellerActions";
 import type { FieldConfig, FormValues } from "./EntityForm";
 
 const checkPhone = (value: string) =>
@@ -6,51 +7,37 @@ const checkPhone = (value: string) =>
     ? null
     : "Use the local format with 10 digits, e.g. 0745093837.";
 
-const checkPassword = (value: string) =>
-  value.length >= 6 ? null : "Use at least 6 characters.";
+const checkEmail = (value: string) =>
+  /^\S+@\S+\.\S+$/.test(value) ? null : "Enter a valid email address.";
 
-interface SellerFieldOptions {
-  isEdit: boolean; // when editing, the password can be left empty (it stays the same)
-  takenUsernames: string[]; // usernames that cannot be used again
-}
+const checkPassword = (value: string) =>
+  value.length >= 8 ? null : "Use at least 8 characters.";
 
 // THE LIST OF FIELDS for the seller form.
-export function getSellerFields({ isEdit, takenUsernames }: SellerFieldOptions): FieldConfig[] {
+// When editing, the password can be left empty (it stays the same).
+export function getSellerFields(isEdit: boolean): FieldConfig[] {
   return [
     { name: "name", section: "Seller details", label: "Full name", type: "text", required: true, placeholder: "e.g. Jane Wanjiku" },
-    {
-      name: "phone",
-      label: "Phone number",
-      type: "text",
-      required: true,
-      placeholder: "0745093837",
-      validate: checkPhone,
-    },
+    { name: "phone", label: "Phone number", type: "text", required: true, placeholder: "0745093837", validate: checkPhone },
 
     {
-      name: "username",
+      name: "email",
       section: "Login details",
-      label: "Username",
+      label: "Email",
       type: "text",
       required: true,
-      placeholder: "e.g. jane_cars",
-      help: "3 to 20 lowercase letters, numbers or underscores. The seller types this to log in.",
-      validate: (value) => {
-        if (!/^[a-z0-9_]{3,20}$/.test(value)) {
-          return "Use 3 to 20 lowercase letters, numbers or underscores.";
-        }
-        if (takenUsernames.includes(value)) return "This username is already taken.";
-        return null;
-      },
+      placeholder: "jane@example.com",
+      validate: checkEmail,
+      help: "The seller logs in with this email.",
     },
     {
       name: "password",
       label: isEdit ? "New password" : "Password",
       type: "text",
       required: !isEdit,
-      placeholder: isEdit ? "Leave empty to keep the current password" : "At least 6 characters",
-      help: "Shown as plain text so you can tell it to the seller.",
+      placeholder: isEdit ? "Leave empty to keep the current password" : "At least 8 characters",
       validate: checkPassword,
+      help: "Shown as plain text so you can tell it to the seller. It is stored securely and cannot be read again.",
     },
 
     { name: "active", label: "Account is active (the seller can log in)", type: "checkbox" },
@@ -59,29 +46,27 @@ export function getSellerFields({ isEdit, takenUsernames }: SellerFieldOptions):
 
 // What the form looks like before anything is typed (for "Add seller")
 export function getEmptySellerValues(): FormValues {
-  return { name: "", phone: "", username: "", password: "", active: true };
+  return { name: "", phone: "", email: "", password: "", active: true };
 }
 
 // A saved seller → the values to put in the form (the password box starts empty)
-export function sellerToFormValues(seller: Seller): FormValues {
+export function sellerToFormValues(seller: SellerAccount): FormValues {
   return {
     name: seller.name,
     phone: seller.phone,
-    username: seller.username,
+    email: seller.email,
     password: "",
     active: seller.active,
   };
 }
 
-// The form's values → the fields of a seller (an empty password on edit means "keep the old one")
-export function sellerValuesToFields(values: FormValues): Partial<Seller> {
-  const password = String(values.password);
-
+// The form's values → what the server action needs
+export function sellerValuesToInput(values: FormValues): SellerInput {
   return {
     name: String(values.name).trim(),
     phone: String(values.phone).replace(/\s/g, ""),
-    username: String(values.username).trim(),
+    email: String(values.email).trim(),
+    password: String(values.password),
     active: Boolean(values.active),
-    ...(password ? { password } : {}),
   };
 }

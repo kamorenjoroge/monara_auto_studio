@@ -2,17 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { AlertCircle, Pencil, Trash2 } from "lucide-react";
 
-import { carsStore, sellersStore, type Seller } from "@/lib/adminStore";
-import { useLocalStore } from "../../useLocalStore";
+import { deleteSeller, setSellerActive } from "@/lib/sellerActions";
+import { fetchSellers, type SellerAccount } from "@/lib/sellersDb";
+import { useSupabaseList } from "../../useSupabaseList";
 import AdminPageHeader from "../../AdminPageHeader";
 import ConfirmDialog from "../../ConfirmDialog";
 import DataTable, { type Column } from "../../DataTable";
 import RoleGuard from "../../RoleGuard";
 
 // Save this file as app/admin/(dashboard)/sellers/page.tsx
-// The whole page is wrapped in RoleGuard, so only the admin can open it.
+// The whole page is wrapped in RoleGuard, so only the admin sees it.
+// (The real protection is on the server: only an admin can create, change or delete sellers.)
 export default function AdminSellersPage() {
   return (
     <RoleGuard roles={["admin"]}>
@@ -22,19 +24,36 @@ export default function AdminSellersPage() {
 }
 
 function SellersContent() {
-  const { items: sellers, loading, update, remove, reset } = useLocalStore(sellersStore);
-  const { items: cars, loading: carsLoading } = useLocalStore(carsStore);
+  const { items: sellers, loading, error: loadError, reload } = useSupabaseList(fetchSellers);
 
   // The seller waiting for "Are you sure?" (null = no pop-up)
-  const [sellerToDelete, setSellerToDelete] = useState<Seller | null>(null);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [sellerToDelete, setSellerToDelete] = useState<SellerAccount | null>(null);
+  const [message, setMessage] = useState("");
 
-  if (loading || carsLoading) return <p className="text-muted-foreground">Loading...</p>;
+  if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
   const activeCount = sellers.filter((seller) => seller.active).length;
 
+  // After any change: show a problem if there was one, then read the list again
+  const finish = async (problem: string | null) => {
+    setMessage(problem ?? "");
+    if (!problem) await reload();
+  };
+
+  const handleToggle = async (seller: SellerAccount) => {
+    const result = await setSellerActive(seller.id, !seller.active);
+    await finish(result.error);
+  };
+
+  const handleDelete = async () => {
+    if (!sellerToDelete) return;
+    const result = await deleteSeller(sellerToDelete.id);
+    setSellerToDelete(null);
+    await finish(result.error);
+  };
+
   // The columns of the table
-  const columns: Column<Seller>[] = [
+  const columns: Column<SellerAccount>[] = [
     {
       key: "seller",
       header: "Seller",
@@ -45,7 +64,7 @@ function SellersContent() {
           </span>
           <div>
             <p className="font-semibold text-foreground">{seller.name}</p>
-            <p className="text-xs text-muted-foreground">@{seller.username}</p>
+            <p className="text-xs text-muted-foreground">{seller.email}</p>
           </div>
         </div>
       ),
@@ -54,20 +73,6 @@ function SellersContent() {
       key: "phone",
       header: "Phone",
       render: (seller) => <span className="text-muted-foreground">{seller.phone}</span>,
-    },
-    {
-      key: "cars",
-      header: "Cars",
-      render: (seller) => {
-        const sellerCars = cars.filter((car) => car.sellerId === seller.id);
-        const pending = sellerCars.filter((car) => car.approvalStatus === "pending").length;
-        return (
-          <div className="text-muted-foreground">
-            <span className="font-semibold text-foreground">{sellerCars.length}</span>
-            {pending > 0 && <span className="ml-2 text-xs text-accent">{pending} pending</span>}
-          </div>
-        );
-      },
     },
     {
       key: "status",
@@ -89,14 +94,23 @@ function SellersContent() {
     },
   ];
 
+  const errorText = message || loadError;
+
   return (
     <div className="space-y-8">
       <AdminPageHeader
         title="Sellers"
-        description="Customers who sell their cars through Monara. You create their accounts and they log in to add cars."
+        description="Customers who sell their cars through Monara. You create their accounts and they log in with their email to add cars."
         actionLabel="Add seller"
         actionHref="/admin/sellers/new"
       />
+
+      {errorText && (
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-foreground">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          {errorText}
+        </div>
+      )}
 
       <section className="space-y-4">
         <p className="text-sm text-muted-foreground">
@@ -112,7 +126,7 @@ function SellersContent() {
             <div className="flex items-center justify-end gap-4">
               {/* A quick way to stop or allow a seller to log in */}
               <button
-                onClick={() => update(seller.id, { active: !seller.active })}
+                onClick={() => handleToggle(seller)}
                 className="text-sm font-semibold text-secondary hover:underline"
               >
                 {seller.active ? "Disable" : "Enable"}
@@ -137,17 +151,6 @@ function SellersContent() {
             </div>
           )}
         />
-
-        {/* Demo helper: go back to just the demo seller */}
-        <div className="pt-2">
-          <button
-            onClick={() => setConfirmReset(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reset demo data
-          </button>
-        </div>
       </section>
 
       {/* "Are you sure?" pop-up for delete */}
@@ -157,23 +160,7 @@ function SellersContent() {
         message={`"${sellerToDelete?.name ?? ""}" will not be able to log in any more. Their cars stay in the system.`}
         confirmLabel="Delete"
         onCancel={() => setSellerToDelete(null)}
-        onConfirm={() => {
-          if (sellerToDelete) remove(sellerToDelete.id);
-          setSellerToDelete(null);
-        }}
-      />
-
-      {/* "Are you sure?" pop-up for reset */}
-      <ConfirmDialog
-        open={confirmReset}
-        title="Reset demo data?"
-        message="All sellers you created, edited or deleted here will be replaced by the single demo seller."
-        confirmLabel="Reset"
-        onCancel={() => setConfirmReset(false)}
-        onConfirm={() => {
-          reset();
-          setConfirmReset(false);
-        }}
+        onConfirm={handleDelete}
       />
     </div>
   );

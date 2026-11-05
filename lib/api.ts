@@ -1,7 +1,7 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
 
-import cars from "./cars.json";
+import {rowToCar} from "./carsDb";
 import { rowToPackage } from "./packagesDb";
 import { rowToGalleryItem } from "./galleryDb";
 import { rowToProduct } from "./productsDb";
@@ -89,9 +89,21 @@ export async function getPackages(): Promise<Package[]> {
   return data.map(rowToPackage);
 }
 
-// ---------- Cars (still the sample JSON file) ----------
+// ---------- Cars (read from Supabase, remembered for a minute) ----------
+// The database rules show visitors APPROVED cars only, and we ask for approved ones explicitly too.
 export async function getCars(): Promise<Car[]> {
-  return cars as unknown as Car[];
+  "use cache";
+  cacheLife("minutes");
+  cacheTag("cars");
+
+  const { data, error } = await publicClient()
+    .from("cars")
+    .select("*")
+    .eq("approval_status", "approved")
+    .order("created_at", { ascending: false });
+
+  if (error || !data) return [];
+  return data.map(rowToCar);
 }
 
 export async function getFeaturedCars(): Promise<Car[]> {
@@ -110,8 +122,7 @@ export async function getSimilarCars(car: Car, limit = 3): Promise<Car[]> {
   return all
     .filter(
       (other) =>
-        other.id !== car.id &&
-        (other.bodyType === car.bodyType || other.make === car.make),
+        other.id !== car.id && (other.bodyType === car.bodyType || other.make === car.make),
     )
     .slice(0, limit);
 }

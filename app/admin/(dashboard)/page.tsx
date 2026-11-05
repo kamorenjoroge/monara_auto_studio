@@ -10,44 +10,44 @@ import {
   Images,
   ShoppingBag,
   Tag,
+  Users,
   Wrench,
   XCircle,
 } from "lucide-react";
 
-import { getContentCounts } from "@/lib/adminStore";
+import { fetchAdminCars } from "@/lib/carsDb";
+import { fetchContentCounts } from "@/lib/dashboardDb";
 import { formatKES } from "@/lib/types";
 import type { ApprovalStatus } from "@/lib/types";
 import { useAuth } from "../AuthProvider";
-import { useAdminCars } from "../useAdminCars"
+import { useSupabaseList } from "../useSupabaseList";
 import StatCard from "../StatCard";
 import ApprovalBadge from "../ApprovalBadge";
 
 // Save this file as app/admin/(dashboard)/page.tsx
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { cars, loading } = useAdminCars();
+
+  // The cars: the admin gets every car, a seller gets only their own (decided by the database)
+  const { items: cars, loading, error: loadError } = useSupabaseList(fetchAdminCars);
+
+  // The website content numbers (only shown to the admin)
+  const { items: countList } = useSupabaseList(fetchContentCounts);
 
   if (!user) return null; // the guard already handles this
-
   if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
   const isAdmin = user.role === "admin";
-
-  // The admin sees every car. A seller sees only their own.
-  const myCars = isAdmin ? cars : cars.filter((car) => car.sellerId === user.id);
+  const counts = countList[0];
 
   // A car with no approvalStatus counts as approved
   const statusOf = (status: ApprovalStatus | undefined) => status ?? "approved";
-  const live = myCars.filter((car) => statusOf(car.approvalStatus) === "approved").length;
-  const pending = myCars.filter((car) => statusOf(car.approvalStatus) === "pending").length;
-  const rejected = myCars.filter((car) => statusOf(car.approvalStatus) === "rejected").length;
+  const live = cars.filter((car) => statusOf(car.approvalStatus) === "approved").length;
+  const pending = cars.filter((car) => statusOf(car.approvalStatus) === "pending").length;
+  const rejected = cars.filter((car) => statusOf(car.approvalStatus) === "rejected").length;
 
-  // The 5 newest cars
-  const latest = [...myCars]
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 5);
-
-  const counts = getContentCounts();
+  // The 5 newest cars (the list already comes newest first)
+  const latest = cars.slice(0, 5);
 
   return (
     <div className="space-y-8">
@@ -61,6 +61,13 @@ export default function DashboardPage() {
           Welcome back, <span className="font-bold">{user.name}</span>.
         </p>
       </div>
+
+      {loadError && (
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-foreground">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          {loadError}
+        </div>
+      )}
 
       {/* Alert: admin has cars to approve */}
       {isAdmin && pending > 0 && (
@@ -104,7 +111,7 @@ export default function DashboardPage() {
           {isAdmin ? "All cars" : "My cars"}
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Total cars" value={myCars.length} icon={Car} href="/admin/cars" />
+          <StatCard label="Total cars" value={cars.length} icon={Car} href="/admin/cars" />
           <StatCard label="Live on website" value={live} icon={CheckCircle2} />
           <StatCard
             label="Waiting for approval"
@@ -118,16 +125,17 @@ export default function DashboardPage() {
       </section>
 
       {/* Website content numbers (admin only) */}
-      {isAdmin && (
+      {isAdmin && counts && (
         <section>
           <h2 className="mb-4 font-heading text-sm font-bold uppercase tracking-wider text-foreground">
             Website content
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <StatCard label="Sellers" value={counts.sellers} icon={Users} href="/admin/sellers" />
             <StatCard label="Services" value={counts.services} icon={Wrench} href="/admin/services" />
             <StatCard label="Packages" value={counts.packages} icon={Tag} href="/admin/packages" />
             <StatCard label="Products" value={counts.products} icon={ShoppingBag} href="/admin/products" />
-            <StatCard label="Gallery" value="Manage" icon={Images} href="/admin/gallery" />
+            <StatCard label="Gallery photos" value={counts.gallery} icon={Images} href="/admin/gallery" />
           </div>
         </section>
       )}
@@ -163,8 +171,7 @@ export default function DashboardPage() {
                     <p className="text-sm font-semibold text-foreground">{car.title}</p>
                     <p className="text-xs text-muted-foreground">
                       {car.year}
-                      {isAdmin &&
-                        ` · ${car.sellerId === "usr-admin" ? "Added by admin" : "Added by seller"}`}
+                      {isAdmin && ` · Added by ${car.ownerName}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-4">

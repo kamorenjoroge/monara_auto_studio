@@ -1,11 +1,13 @@
 'use client';
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft } from "lucide-react";
 
-import { sellersStore, type Seller } from "@/lib/adminStore";
-import { useLocalStore } from "../../useLocalStore";
+import { createSeller, updateSeller } from "@/lib/sellerActions";
+import { fetchSellers } from "@/lib/sellersDb";
+import { useSupabaseList } from "../../useSupabaseList";
 import AdminPageHeader from "../../AdminPageHeader";
 import EntityForm, { type FormValues } from "../../EntityForm";
 import RoleGuard from "../../RoleGuard";
@@ -13,7 +15,7 @@ import {
   getEmptySellerValues,
   getSellerFields,
   sellerToFormValues,
-  sellerValuesToFields,
+  sellerValuesToInput,
 } from "../../sellerFields";
 
 interface SellerFormScreenProps {
@@ -32,7 +34,8 @@ export default function SellerFormScreen({ sellerId }: SellerFormScreenProps) {
 
 function SellerFormContent({ sellerId }: SellerFormScreenProps) {
   const router = useRouter();
-  const { items: sellers, loading, add, update } = useLocalStore(sellersStore);
+  const { items: sellers, loading, error: loadError } = useSupabaseList(fetchSellers);
+  const [error, setError] = useState("");
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
@@ -43,7 +46,9 @@ function SellerFormContent({ sellerId }: SellerFormScreenProps) {
   if (isEdit && !seller) {
     return (
       <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-10 text-center">
-        <p className="text-foreground">This seller was not found. They may have been deleted.</p>
+        <p className="text-foreground">
+          {loadError || "This seller was not found. They may have been deleted."}
+        </p>
         <Link
           href="/admin/sellers"
           className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-secondary hover:underline"
@@ -55,31 +60,17 @@ function SellerFormContent({ sellerId }: SellerFormScreenProps) {
     );
   }
 
-  // Usernames that cannot be used: the admin's, and every other seller's
-  const takenUsernames = [
-    "qwerty",
-    ...sellers.filter((item) => item.id !== sellerId).map((item) => item.username),
-  ];
+  // Runs when the form is valid: the SERVER creates or updates the account
+  const handleSubmit = async (values: FormValues) => {
+    setError("");
+    const input = sellerValuesToInput(values);
 
-  // Runs when the form is valid
-  const handleSubmit = (values: FormValues) => {
-    const fields = sellerValuesToFields(values);
+    const result = seller ? await updateSeller(seller.id, input) : await createSeller(input);
 
-    if (seller) {
-      // EDIT: change the fields (an empty password keeps the old one)
-      update(seller.id, fields);
-    } else {
-      // ADD: make a new seller account
-      const newSeller: Seller = {
-        id: `usr-${Date.now()}`,
-        name: fields.name ?? "",
-        phone: fields.phone ?? "",
-        username: fields.username ?? "",
-        password: fields.password ?? "",
-        active: fields.active ?? true,
-        createdAt: new Date().toISOString().slice(0, 10),
-      };
-      add(newSeller);
+    if (result.error) {
+      setError(result.error);
+      window.scrollTo({ top: 0, behavior: "smooth" }); // so the message is seen
+      return;
     }
 
     router.push("/admin/sellers");
@@ -104,10 +95,17 @@ function SellerFormContent({ sellerId }: SellerFormScreenProps) {
         }
       />
 
+      {error && (
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-foreground">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          {error}
+        </div>
+      )}
+
       {/* key makes the form start fresh for each seller */}
       <EntityForm
         key={seller?.id ?? "new"}
-        fields={getSellerFields({ isEdit, takenUsernames })}
+        fields={getSellerFields(isEdit)}
         initialValues={seller ? sellerToFormValues(seller) : getEmptySellerValues()}
         submitLabel={isEdit ? "Save changes" : "Create seller"}
         cancelHref="/admin/sellers"

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import EditCarForm from "../../EditCarForm";
+import CarFormScreen from "../../CarFormScreen";
 
 interface EditCarPageProps {
   params: Promise<{ id: string }>;
@@ -18,8 +18,8 @@ export default function EditCarPage({ params }: EditCarPageProps) {
   );
 }
 
-// STEP B: read the id from the web address and hand it to the edit screen.
+// STEP B: read the id from the web address and hand it to the form screen.
 async function EditCar({ params }: EditCarPageProps) {
   const { id } = await params;
-  return <EditCarForm carId={id} />;
+  return <CarFormScreen carId={id} />;
 }

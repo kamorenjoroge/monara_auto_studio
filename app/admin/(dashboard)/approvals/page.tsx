@@ -1,27 +1,25 @@
 'use client';
 
 import { useState } from "react";
-import { CheckCircle2, ClipboardCheck, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, ClipboardCheck, XCircle } from "lucide-react";
 
+import { fetchAdminCars, setCarApproval, type AdminCar } from "@/lib/carsDb";
+import { refreshPublic } from "@/lib/refresh";
 import { formatKES, formatMileage } from "@/lib/types";
-import type { ApprovalStatus, Car } from "@/lib/types";
-import { useAdminCars } from "../../useAdminCars";
+import type { ApprovalStatus } from "@/lib/types";
+import { useAuth } from "../../AuthProvider";
+import { useSupabaseList } from "../../useSupabaseList";
 import AdminPageHeader from "../../AdminPageHeader";
 import ApprovalBadge from "../../ApprovalBadge";
 import ConfirmDialog from "../../ConfirmDialog";
 import RoleGuard from "../../RoleGuard";
 
-const ADMIN_ID = "usr-admin";
-
 // A car with no approvalStatus counts as approved
-const approvalOf = (car: Car): ApprovalStatus => car.approvalStatus ?? "approved";
-
-// Who added the car (later this will be the seller's real name)
-const ownerLabel = (car: Car) =>
-  car.sellerId === ADMIN_ID ? "Admin" : car.sellerId === "usr-seller-demo" ? "Demo Seller" : "Seller";
+const approvalOf = (car: AdminCar): ApprovalStatus => car.approvalStatus ?? "approved";
 
 // Save this file as app/admin/(dashboard)/approvals/page.tsx
-// The whole page is wrapped in RoleGuard, so only the admin can open it.
+// The whole page is wrapped in RoleGuard, so only the admin sees it.
+// (The real protection is in the database: only the admin may approve or reject cars.)
 export default function ApprovalsPage() {
   return (
     <RoleGuard roles={["admin"]}>
@@ -31,15 +29,18 @@ export default function ApprovalsPage() {
 }
 
 function ApprovalsContent() {
-  const { cars, loading, updateCar } = useAdminCars();
+  const { user } = useAuth();
+  const { supabase, items: cars, loading, error: loadError, reload } = useSupabaseList(fetchAdminCars);
 
   // The car being rejected (null = no pop-up) and the reason typed in the pop-up
-  const [carToReject, setCarToReject] = useState<Car | null>(null);
+  const [carToReject, setCarToReject] = useState<AdminCar | null>(null);
   const [reason, setReason] = useState("");
 
-  // A short message after approving or rejecting
+  // A short message after approving or rejecting, and a message if something went wrong
   const [notice, setNotice] = useState("");
+  const [problem, setProblem] = useState("");
 
+  if (!user) return null; // the guard already handles this
   if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
   // Oldest first: the car that has waited longest is at the top
@@ -47,14 +48,25 @@ function ApprovalsContent() {
     .filter((car) => approvalOf(car) === "pending")
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-  // Seller cars that were already decided
-  const reviewed = cars.filter(
-    (car) => car.sellerId !== ADMIN_ID && approvalOf(car) !== "pending",
-  );
+  // Cars added by sellers (not by this admin) that were already decided
+  const reviewed = cars.filter((car) => car.sellerId !== user.id && approvalOf(car) !== "pending");
 
-  const approve = (car: Car) => {
-    updateCar(car.id, { approvalStatus: "approved", rejectionReason: undefined });
-    setNotice(`"${car.title}" was approved and is now live.`);
+  // After a decision: clear the website's memory and read the list again
+  const finish = async (message: string | null, success: string) => {
+    if (message) {
+      setProblem(message);
+      setNotice("");
+      return;
+    }
+    setProblem("");
+    setNotice(success);
+    await refreshPublic("cars");
+    await reload();
+  };
+
+  const approve = async (car: AdminCar) => {
+    const message = await setCarApproval(supabase, car.id, "approved");
+    await finish(message, `"${car.title}" was approved and is now live.`);
   };
 
   const closeRejectDialog = () => {
@@ -62,15 +74,15 @@ function ApprovalsContent() {
     setReason("");
   };
 
-  const reject = () => {
+  const reject = async () => {
     if (!carToReject) return;
-    updateCar(carToReject.id, {
-      approvalStatus: "rejected",
-      rejectionReason: reason.trim(),
-    });
-    setNotice(`"${carToReject.title}" was rejected. The seller can see your reason.`);
+    const car = carToReject;
+    const message = await setCarApproval(supabase, car.id, "rejected", reason.trim());
     closeRejectDialog();
+    await finish(message, `"${car.title}" was rejected. The seller can see your reason.`);
   };
+
+  const errorText = problem || loadError;
 
   return (
     <div className="space-y-8">
@@ -88,6 +100,13 @@ function ApprovalsContent() {
           >
             Dismiss
           </button>
+        </div>
+      )}
+
+      {errorText && (
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-foreground">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          {errorText}
         </div>
       )}
 
@@ -114,12 +133,10 @@ function ApprovalsContent() {
               >
                 {/* Photos */}
                 <div className="aspect-[16/9] overflow-hidden bg-muted">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={car.images[0]}
-                    alt={car.title}
-                    className="h-full w-full object-cover"
-                  />
+                  {car.images[0] && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={car.images[0]} alt={car.title} className="h-full w-full object-cover" />
+                  )}
                 </div>
                 {car.images.length > 1 && (
                   <div className="flex gap-2 overflow-x-auto p-3">
@@ -143,7 +160,7 @@ function ApprovalsContent() {
                         {car.title}
                       </h3>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Added by {ownerLabel(car)} on {car.createdAt}
+                        Added by {car.ownerName} on {car.createdAt}
                       </p>
                     </div>
                     <p className="shrink-0 font-heading text-lg font-bold text-foreground">
@@ -174,9 +191,7 @@ function ApprovalsContent() {
                     ))}
                   </ul>
 
-                  <p className="mt-4 text-sm leading-relaxed text-foreground/80">
-                    {car.description}
-                  </p>
+                  <p className="mt-4 text-sm leading-relaxed text-foreground/80">{car.description}</p>
 
                   {car.features.length > 0 && (
                     <p className="mt-3 text-xs text-muted-foreground">
@@ -225,7 +240,7 @@ function ApprovalsContent() {
                   <div>
                     <p className="text-sm font-semibold text-foreground">{car.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {ownerLabel(car)} · {formatKES(car.price)}
+                      {car.ownerName} · {formatKES(car.price)}
                     </p>
                     {approvalOf(car) === "rejected" && car.rejectionReason && (
                       <p className="mt-1 text-xs text-destructive">{car.rejectionReason}</p>

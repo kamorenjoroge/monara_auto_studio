@@ -4,25 +4,28 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  AlertCircle,
   BadgeCheck,
   Car as CarIcon,
   CheckCircle2,
   ClipboardCheck,
   Clock,
+  Database,
   ExternalLink,
   Key,
   Pencil,
-  RotateCcw,
   Search,
   Ship,
   Trash2,
   XCircle,
 } from "lucide-react";
 
+import { deleteCar, fetchAdminCars,  type AdminCar } from "@/lib/carsDb";
+import { refreshPublic } from "@/lib/refresh";
 import { formatKES } from "@/lib/types";
-import type { ApprovalStatus, Car, CarStatus } from "@/lib/types";
+import type { ApprovalStatus, CarStatus } from "@/lib/types";
 import { useAuth } from "../../AuthProvider";
-import { useAdminCars } from "../../useAdminCars";
+import { useSupabaseList } from "../../useSupabaseList";
 import AdminPageHeader from "../../AdminPageHeader";
 import ApprovalBadge from "../../ApprovalBadge";
 import ConfirmDialog from "../../ConfirmDialog";
@@ -41,12 +44,13 @@ const selectClass =
   "rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/40";
 
 // A car with no approvalStatus counts as approved
-const approvalOf = (car: Car): ApprovalStatus => car.approvalStatus ?? "approved";
+const approvalOf = (car: AdminCar): ApprovalStatus => car.approvalStatus ?? "approved";
 
 // Save this file as app/admin/(dashboard)/cars/page.tsx
+// The admin sees every car. A seller sees only their own (the database makes sure of it).
 export default function AdminCarsPage() {
   const { user } = useAuth();
-  const { cars, loading, deleteCar, resetCars } = useAdminCars();
+  const { supabase, items: cars, loading, error: loadError, reload } = useSupabaseList(fetchAdminCars);
 
   // What the visitor typed or picked in the filters
   const [search, setSearch] = useState("");
@@ -54,26 +58,42 @@ export default function AdminCarsPage() {
   const [availabilityFilter, setAvailabilityFilter] = useState("all");
 
   // The car waiting for "Are you sure?" (null = no pop-up)
-  const [carToDelete, setCarToDelete] = useState<Car | null>(null);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [carToDelete, setCarToDelete] = useState<AdminCar | null>(null);
+  const [message, setMessage] = useState("");
+  const [importing, setImporting] = useState(false);
 
   if (!user) return null; // the guard already handles this
   if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
   const isAdmin = user.role === "admin";
 
-  // The admin sees every car. A seller sees only their own.
-  const myCars = isAdmin ? cars : cars.filter((car) => car.sellerId === user.id);
+  // After any change: clear the website's memory and read the list again
+  const finish = async (problem: string | null) => {
+    if (problem) {
+      setMessage(problem);
+      return;
+    }
+    setMessage("");
+    await refreshPublic("cars");
+    await reload();
+  };
+
+  const handleDelete = async () => {
+    if (!carToDelete) return;
+    const problem = await deleteCar(supabase, carToDelete.id);
+    setCarToDelete(null);
+    await finish(problem);
+  };
 
   // Numbers for the small dashboard
   const countApproval = (status: ApprovalStatus) =>
-    myCars.filter((car) => approvalOf(car) === status).length;
+    cars.filter((car) => approvalOf(car) === status).length;
   const countAvailability = (status: CarStatus) =>
-    myCars.filter((car) => car.status === status).length;
+    cars.filter((car) => car.status === status).length;
 
   // Apply the search and the two filters
   const query = search.trim().toLowerCase();
-  const visibleCars = myCars.filter((car) => {
+  const visibleCars = cars.filter((car) => {
     if (query && !`${car.title} ${car.make} ${car.model} ${car.year}`.toLowerCase().includes(query))
       return false;
     if (approvalFilter !== "all" && approvalOf(car) !== approvalFilter) return false;
@@ -82,7 +102,7 @@ export default function AdminCarsPage() {
   });
 
   // The columns of the table
-  const columns: Column<Car>[] = [
+  const columns: Column<AdminCar>[] = [
     {
       key: "car",
       header: "Car",
@@ -144,13 +164,11 @@ export default function AdminCarsPage() {
     columns.push({
       key: "owner",
       header: "Added by",
-      render: (car) => (
-        <span className="text-muted-foreground">
-          {car.sellerId === "usr-admin" ? "Admin" : "Seller"}
-        </span>
-      ),
+      render: (car) => <span className="text-muted-foreground">{car.ownerName}</span>,
     });
   }
+
+  const errorText = message || loadError;
 
   return (
     <div className="space-y-8">
@@ -165,131 +183,157 @@ export default function AdminCarsPage() {
         actionHref="/admin/cars/new"
       />
 
-      {/* Small dashboard: approval */}
-      <section>
-        <h2 className="mb-4 font-heading text-sm font-bold uppercase tracking-wider text-foreground">
-          Approval
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Total cars" value={myCars.length} icon={CarIcon} />
-          <StatCard label="Live on website" value={countApproval("approved")} icon={CheckCircle2} />
-          <StatCard
-            label="Waiting for approval"
-            value={countApproval("pending")}
-            icon={ClipboardCheck}
-            highlight={countApproval("pending") > 0}
-          />
-          <StatCard label="Rejected" value={countApproval("rejected")} icon={XCircle} />
+      {errorText && (
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-foreground">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          {errorText}
         </div>
-      </section>
+      )}
 
-      {/* Small dashboard: availability */}
-      <section>
-        <h2 className="mb-4 font-heading text-sm font-bold uppercase tracking-wider text-foreground">
-          Availability
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Available" value={countAvailability("Available")} icon={Key} />
-          <StatCard label="Reserved" value={countAvailability("Reserved")} icon={Clock} />
-          <StatCard label="Sold" value={countAvailability("Sold")} icon={BadgeCheck} />
-          <StatCard label="Incoming" value={countAvailability("Incoming")} icon={Ship} />
-        </div>
-      </section>
-
-      {/* Search, filters and the table */}
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by make, model or year..."
-              className="w-full rounded-lg border border-border bg-white py-2.5 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/40"
-            />
-          </div>
-
-          <select
-            value={approvalFilter}
-            onChange={(e) => setApprovalFilter(e.target.value)}
-            className={selectClass}
-            aria-label="Filter by approval"
-          >
-            <option value="all">All approvals</option>
-            <option value="approved">Approved</option>
-            <option value="pending">Pending</option>
-            <option value="rejected">Rejected</option>
-          </select>
-
-          <select
-            value={availabilityFilter}
-            onChange={(e) => setAvailabilityFilter(e.target.value)}
-            className={selectClass}
-            aria-label="Filter by availability"
-          >
-            <option value="all">All availability</option>
-            <option value="Available">Available</option>
-            <option value="Reserved">Reserved</option>
-            <option value="Sold">Sold</option>
-            <option value="Incoming">Incoming</option>
-          </select>
-        </div>
-
-        <p className="text-sm text-muted-foreground">
-          <span className="font-bold text-foreground">{visibleCars.length}</span>{" "}
-          {visibleCars.length === 1 ? "car" : "cars"} shown
-        </p>
-
-        <DataTable
-          columns={columns}
-          rows={visibleCars}
-          emptyMessage="No cars match your search."
-          actions={(car) => (
-            <div className="flex items-center justify-end gap-4">
-              {/* Only approved cars have a public page to look at */}
-              {approvalOf(car) === "approved" && (
-                <Link
-                  href={`/cars/${car.slug}`}
-                  target="_blank"
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-secondary hover:underline"
-                >
-                  View
-                  <ExternalLink className="h-4 w-4" />
-                </Link>
-              )}
-
-              <Link
-                href={`/admin/cars/${car.id}/edit`}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-secondary hover:underline"
-              >
-                <Pencil className="h-4 w-4" />
-                Edit
-              </Link>
-
+      {/* An empty database: the admin can copy the sample cars from cars.json 
+      {cars.length === 0 && !loadError && (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
+          <Database className="mx-auto h-10 w-10 text-muted-foreground" />
+          <p className="mt-3 text-sm text-foreground">
+            {isAdmin ? "The database has no cars yet." : "You have not added any cars yet."}
+          </p>
+          {isAdmin ? (
+            <>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Copy the sample cars from cars.json, or add your own with the button above.
+              </p>
               <button
-                onClick={() => setCarToDelete(car)}
-                aria-label={`Delete ${car.title}`}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-destructive hover:underline"
+                onClick={handleImport}
+                disabled={importing}
+                className="mt-5 rounded-xl bg-gold-gradient px-6 py-2.5 text-sm font-semibold text-primary-foreground transition hover:glow-gold disabled:opacity-60"
               >
-                <Trash2 className="h-4 w-4" />
-                Delete
+                {importing ? "Importing..." : "Import the sample cars"}
               </button>
-            </div>
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-muted-foreground">Use the Add car button above to start.</p>
           )}
-        />
-
-        {/* Demo helper: bring the sample cars back after deleting */}
-        <div className="pt-2">
-          <button
-            onClick={() => setConfirmReset(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reset demo data
-          </button>
         </div>
-      </section>
+      )} */}
+
+      {cars.length > 0 && (
+        <>
+          {/* Small dashboard: approval */}
+          <section>
+            <h2 className="mb-4 font-heading text-sm font-bold uppercase tracking-wider text-foreground">
+              Approval
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard label="Total cars" value={cars.length} icon={CarIcon} />
+              <StatCard label="Live on website" value={countApproval("approved")} icon={CheckCircle2} />
+              <StatCard
+                label="Waiting for approval"
+                value={countApproval("pending")}
+                icon={ClipboardCheck}
+                highlight={countApproval("pending") > 0}
+              />
+              <StatCard label="Rejected" value={countApproval("rejected")} icon={XCircle} />
+            </div>
+          </section>
+
+          {/* Small dashboard: availability */}
+          <section>
+            <h2 className="mb-4 font-heading text-sm font-bold uppercase tracking-wider text-foreground">
+              Availability
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard label="Available" value={countAvailability("Available")} icon={Key} />
+              <StatCard label="Reserved" value={countAvailability("Reserved")} icon={Clock} />
+              <StatCard label="Sold" value={countAvailability("Sold")} icon={BadgeCheck} />
+              <StatCard label="Incoming" value={countAvailability("Incoming")} icon={Ship} />
+            </div>
+          </section>
+
+          {/* Search, filters and the table */}
+          <section className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by make, model or year..."
+                  className="w-full rounded-lg border border-border bg-white py-2.5 pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/40"
+                />
+              </div>
+
+              <select
+                value={approvalFilter}
+                onChange={(e) => setApprovalFilter(e.target.value)}
+                className={selectClass}
+                aria-label="Filter by approval"
+              >
+                <option value="all">All approvals</option>
+                <option value="approved">Approved</option>
+                <option value="pending">Pending</option>
+                <option value="rejected">Rejected</option>
+              </select>
+
+              <select
+                value={availabilityFilter}
+                onChange={(e) => setAvailabilityFilter(e.target.value)}
+                className={selectClass}
+                aria-label="Filter by availability"
+              >
+                <option value="all">All availability</option>
+                <option value="Available">Available</option>
+                <option value="Reserved">Reserved</option>
+                <option value="Sold">Sold</option>
+                <option value="Incoming">Incoming</option>
+              </select>
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              <span className="font-bold text-foreground">{visibleCars.length}</span>{" "}
+              {visibleCars.length === 1 ? "car" : "cars"} shown
+            </p>
+
+            <DataTable
+              columns={columns}
+              rows={visibleCars}
+              emptyMessage="No cars match your search."
+              actions={(car) => (
+                <div className="flex items-center justify-end gap-4">
+                  {/* Only approved cars have a public page to look at */}
+                  {approvalOf(car) === "approved" && (
+                    <Link
+                      href={`/cars/${car.slug}`}
+                      target="_blank"
+                      className="inline-flex items-center gap-1.5 text-sm font-semibold text-secondary hover:underline"
+                    >
+                      View
+                      <ExternalLink className="h-4 w-4" />
+                    </Link>
+                  )}
+
+                  <Link
+                    href={`/admin/cars/${car.id}/edit`}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-secondary hover:underline"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Edit
+                  </Link>
+
+                  <button
+                    onClick={() => setCarToDelete(car)}
+                    aria-label={`Delete ${car.title}`}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-destructive hover:underline"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </button>
+                </div>
+              )}
+            />
+          </section>
+        </>
+      )}
 
       {/* "Are you sure?" pop-up for delete */}
       <ConfirmDialog
@@ -298,23 +342,7 @@ export default function AdminCarsPage() {
         message={`"${carToDelete?.title ?? ""}" will be removed. This cannot be undone.`}
         confirmLabel="Delete"
         onCancel={() => setCarToDelete(null)}
-        onConfirm={() => {
-          if (carToDelete) deleteCar(carToDelete.id);
-          setCarToDelete(null);
-        }}
-      />
-
-      {/* "Are you sure?" pop-up for reset */}
-      <ConfirmDialog
-        open={confirmReset}
-        title="Reset demo data?"
-        message="All cars you added, edited or deleted here will be replaced by the original sample cars."
-        confirmLabel="Reset"
-        onCancel={() => setConfirmReset(false)}
-        onConfirm={() => {
-          resetCars();
-          setConfirmReset(false);
-        }}
+        onConfirm={handleDelete}
       />
     </div>
   );
