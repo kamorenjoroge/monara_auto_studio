@@ -1,4 +1,4 @@
-import { cacheLife, cacheTag } from "next/cache";
+import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 import { DEFAULT_SITE_DATA, makeSite, type Site, type SiteData } from "./site";
@@ -7,15 +7,9 @@ import { DEFAULT_SITE_DATA, makeSite, type Site, type SiteData } from "./site";
 // It uses only the public (publishable) key, so it can read only what the rules allow:
 // the settings table is public for reading.
 //
-// "use cache" tells Next.js to REMEMBER the result for a while, so pages do not wait for the
-// database on every visit or navigation. That is what keeps navigation instant.
-// The contact details change rarely, so a few minutes is fine.
+// `cache` makes the many calls on one page share ONE database read.
 // If anything goes wrong, the fallback values are used so the page still works.
-export async function getSiteData(): Promise<SiteData> {
-  "use cache";
-  cacheLife("minutes"); // remembered for about a minute, then refreshed in the background
-  cacheTag("site-settings"); // a name, so we can refresh it on demand later
-
+export const getSiteData = cache(async (): Promise<SiteData> => {
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,7 +35,7 @@ export async function getSiteData(): Promise<SiteData> {
   } catch {
     return DEFAULT_SITE_DATA;
   }
-}
+});
 
 // What server components use:   const site = await getSite();   site.phoneUrl   site.whatsappUrl("Hi")
 export async function getSite(): Promise<Site> {

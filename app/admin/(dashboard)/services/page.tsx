@@ -3,19 +3,21 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { AlertCircle, Database, Pencil, Trash2 } from "lucide-react";
 
-import { servicesStore } from "@/lib/adminStore";
+import { refreshPublic } from "@/lib/refresh";
+import { deleteService, fetchServices } from "@/lib/servicesDb";
 import { formatKES, getIcon } from "@/lib/types";
 import type { Service } from "@/lib/types";
-import { useLocalStore } from "../../useLocalStore";
+import { useSupabaseList } from "../../useSupabaseList";
 import AdminPageHeader from "../../AdminPageHeader";
 import ConfirmDialog from "../../ConfirmDialog";
 import DataTable, { type Column } from "../../DataTable";
 import RoleGuard from "../../RoleGuard";
 
 // Save this file as app/admin/(dashboard)/services/page.tsx
-// The whole page is wrapped in RoleGuard, so only the admin can open it.
+// The whole page is wrapped in RoleGuard, so only the admin sees it.
+// (The real protection is in the database: only the admin may change services.)
 export default function AdminServicesPage() {
   return (
     <RoleGuard roles={["admin"]}>
@@ -25,13 +27,33 @@ export default function AdminServicesPage() {
 }
 
 function ServicesContent() {
-  const { items: services, loading, remove, reset } = useLocalStore(servicesStore);
+  const { supabase, items, loading, error: loadError, reload } = useSupabaseList(fetchServices);
 
   // The service waiting for "Are you sure?" (null = no pop-up)
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [message, setMessage] = useState("");
+  const [importing, setImporting] = useState(false);
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>;
+
+  // Newest first
+  const services = [...items].reverse();
+
+  const handleDelete = async () => {
+    if (!serviceToDelete) return;
+    const problem = await deleteService(supabase, serviceToDelete.id);
+    setServiceToDelete(null);
+
+    if (problem) {
+      setMessage(problem);
+      return;
+    }
+    setMessage("");
+    await refreshPublic("services");
+    await reload();
+  };
+
+ 
 
   // The columns of the table
   const columns: Column<Service>[] = [
@@ -93,6 +115,8 @@ function ServicesContent() {
     },
   ];
 
+  const errorText = message || loadError;
+
   return (
     <div className="space-y-8">
       <AdminPageHeader
@@ -102,74 +126,73 @@ function ServicesContent() {
         actionHref="/admin/services/new"
       />
 
-      <section className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          <span className="font-bold text-foreground">{services.length}</span>{" "}
-          {services.length === 1 ? "service" : "services"}
-        </p>
-
-        <DataTable
-          columns={columns}
-          rows={services}
-          emptyMessage="No services yet. Click Add service to create the first one."
-          actions={(service) => (
-            <div className="flex items-center justify-end gap-4">
-              <Link
-                href={`/admin/services/${service.id}/edit`}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-secondary hover:underline"
-              >
-                <Pencil className="h-4 w-4" />
-                Edit
-              </Link>
-
-              <button
-                onClick={() => setServiceToDelete(service)}
-                aria-label={`Delete ${service.title}`}
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-destructive hover:underline"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </button>
-            </div>
-          )}
-        />
-
-        {/* Demo helper: bring the sample services back */}
-        <div className="pt-2">
-          <button
-            onClick={() => setConfirmReset(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reset demo data
-          </button>
+      {errorText && (
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-foreground">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          {errorText}
         </div>
-      </section>
+      )}
+
+      {/* An empty database: offer to copy the sample services from services.json */}
+      {services.length === 0 && !loadError && (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
+          <Database className="mx-auto h-10 w-10 text-muted-foreground" />
+          <p className="mt-3 text-sm text-foreground">The database has no services yet.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Copy the sample services from services.json, or add your own with the button above.
+          </p>
+          {/* <button
+            onClick={handleImport}
+            disabled={importing}
+            className="mt-5 rounded-xl bg-gold-gradient px-6 py-2.5 text-sm font-semibold text-primary-foreground transition hover:glow-gold disabled:opacity-60"
+          >
+            {importing ? "Importing..." : "Import the sample services"}
+          </button> */}
+        </div>
+      )}
+
+      {services.length > 0 && (
+        <section className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-bold text-foreground">{services.length}</span>{" "}
+            {services.length === 1 ? "service" : "services"}
+          </p>
+
+          <DataTable
+            columns={columns}
+            rows={services}
+            actions={(service) => (
+              <div className="flex items-center justify-end gap-4">
+                <Link
+                  href={`/admin/services/${service.id}/edit`}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-secondary hover:underline"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </Link>
+
+                <button
+                  onClick={() => setServiceToDelete(service)}
+                  aria-label={`Delete ${service.title}`}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-destructive hover:underline"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </button>
+              </div>
+            )}
+          />
+        </section>
+      )}
 
       {/* "Are you sure?" pop-up for delete */}
       <ConfirmDialog
         open={serviceToDelete !== null}
         title="Delete this service?"
-        message={`"${serviceToDelete?.title ?? ""}" will be removed. This cannot be undone.`}
+        message={`"${serviceToDelete?.title ?? ""}" will be removed from the website. This cannot be undone.`}
         confirmLabel="Delete"
         onCancel={() => setServiceToDelete(null)}
-        onConfirm={() => {
-          if (serviceToDelete) remove(serviceToDelete.id);
-          setServiceToDelete(null);
-        }}
-      />
-
-      {/* "Are you sure?" pop-up for reset */}
-      <ConfirmDialog
-        open={confirmReset}
-        title="Reset demo data?"
-        message="All services you added, edited or deleted here will be replaced by the original sample services."
-        confirmLabel="Reset"
-        onCancel={() => setConfirmReset(false)}
-        onConfirm={() => {
-          reset();
-          setConfirmReset(false);
-        }}
+        onConfirm={handleDelete}
       />
     </div>
   );

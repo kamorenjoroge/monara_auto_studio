@@ -1,12 +1,13 @@
 'use client';
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft } from "lucide-react";
 
-import { servicesStore } from "@/lib/adminStore";
-import type { Service } from "@/lib/types";
-import { useLocalStore } from "../../useLocalStore";
+import { refreshPublic } from "@/lib/refresh";
+import { createService, fetchServices, updateService } from "@/lib/servicesDb";
+import { useSupabaseList } from "../../useSupabaseList";
 import AdminPageHeader from "../../AdminPageHeader";
 import EntityForm, { type FormValues } from "../../EntityForm";
 import RoleGuard from "../../RoleGuard";
@@ -40,7 +41,8 @@ export default function ServiceFormScreen({ serviceId }: ServiceFormScreenProps)
 
 function ServiceFormContent({ serviceId }: ServiceFormScreenProps) {
   const router = useRouter();
-  const { items: services, loading, add, update } = useLocalStore(servicesStore);
+  const { supabase, items: services, loading, error: loadError } = useSupabaseList(fetchServices);
+  const [error, setError] = useState("");
 
   if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
@@ -51,7 +53,9 @@ function ServiceFormContent({ serviceId }: ServiceFormScreenProps) {
   if (isEdit && !service) {
     return (
       <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-10 text-center">
-        <p className="text-foreground">This service was not found. It may have been deleted.</p>
+        <p className="text-foreground">
+          {loadError || "This service was not found. It may have been deleted."}
+        </p>
         <Link
           href="/admin/services"
           className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-secondary hover:underline"
@@ -63,23 +67,31 @@ function ServiceFormContent({ serviceId }: ServiceFormScreenProps) {
     );
   }
 
-  // Runs when the form is valid
-  const handleSubmit = (values: FormValues) => {
+  // Runs when the form is valid: save to the database
+  const handleSubmit = async (values: FormValues) => {
+    setError("");
     const fields = serviceValuesToFields(values);
+    let message: string | null;
 
     if (service) {
-      // EDIT: change the fields (the web address piece stays the same)
-      update(service.id, fields);
+      // EDIT (the web address piece stays the same)
+      message = await updateService(supabase, service.id, fields);
     } else {
-      // ADD: make a new service with its own id and web address piece
+      // ADD: make a web address piece from the title, and make sure it is not taken
       let slug = slugify(fields.title);
       if (services.some((item) => item.slug === slug)) {
         slug = `${slug}-${Date.now().toString().slice(-4)}`;
       }
-      const newService: Service = { id: `svc-${Date.now()}`, slug, ...fields };
-      add(newService);
+      message = await createService(supabase, slug, fields);
     }
 
+    if (message) {
+      setError(message);
+      window.scrollTo({ top: 0, behavior: "smooth" }); // so the message is seen
+      return;
+    }
+
+    await refreshPublic("services"); // the public website shows the change straight away
     router.push("/admin/services");
   };
 
@@ -97,6 +109,13 @@ function ServiceFormContent({ serviceId }: ServiceFormScreenProps) {
         title={isEdit ? "Edit service" : "Add service"}
         description={service ? service.title : "Describe the service customers can book."}
       />
+
+      {error && (
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-foreground">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          {error}
+        </div>
+      )}
 
       {/* key makes the form start fresh for each service */}
       <EntityForm
