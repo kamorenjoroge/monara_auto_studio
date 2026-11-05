@@ -5,7 +5,7 @@ import { CheckCircle2, MessageCircle, Phone, Send } from "lucide-react";
 
 import { formatKES } from "@/lib/types";
 import type { Car, CarStatus } from "@/lib/types";
-import { phoneUrl, whatsappUrl } from "@/lib/site";
+import { useSite } from "./../components/SiteProvider";
 
 // Color of the status label for each status
 const statusStyles: Record<CarStatus, string> = {
@@ -31,6 +31,8 @@ const CarInquiry = ({ car }: CarInquiryProps) => {
     phone: "",
     message: `Hi, I'm interested in the ${car.title}. Is it still available?`,
   });
+
+  const site = useSite();
   // Error messages to show under the boxes
   const [errors, setErrors] = useState<Record<string, string>>({});
   // True after the form is sent
@@ -195,7 +197,7 @@ const CarInquiry = ({ car }: CarInquiryProps) => {
       {/* Quick contact */}
       <div className="grid grid-cols-2 gap-3 border-t border-border pt-5">
         <a
-          href={whatsappUrl(whatsappMessage)}
+          href={site.whatsappUrl(whatsappMessage)}
           target="_blank"
           rel="noreferrer"
           className="flex items-center justify-center gap-2 rounded-xl bg-whatsapp px-3 py-2.5 text-sm font-semibold text-whatsapp-foreground transition hover:bg-whatsapp-dark"
@@ -204,7 +206,7 @@ const CarInquiry = ({ car }: CarInquiryProps) => {
           WhatsApp
         </a>
         <a
-          href={phoneUrl}
+          href={site.phoneUrl}
           className="flex items-center justify-center gap-2 rounded-xl border-2 border-secondary px-3 py-2.5 text-sm font-semibold text-secondary transition hover:bg-secondary hover:text-secondary-foreground"
         >
           <Phone className="h-4 w-4" />

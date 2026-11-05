@@ -1,8 +1,9 @@
 import { MessageCircle, Phone } from "lucide-react";
+import { getSite } from "@/lib/getSite";
 
-import { phoneUrl, whatsappUrl, SITE } from "@/lib/site";
+const CTABanner = async () => {
+  const site = await getSite();
 
-const CTABanner = () => {
   return (
     <section className="relative overflow-hidden bg-gradient-to-r from-secondary-dark via-secondary to-accent">
       {/* Soft decorative glows */}
@@ -34,14 +35,17 @@ const CTABanner = () => {
         {/* Buttons */}
         <div className="mt-8 flex flex-wrap gap-3">
           <a
-            href={phoneUrl}
+            href={site.phoneUrl}
             className="flex items-center gap-2 rounded-xl bg-gold-gradient px-6 py-3 text-sm font-semibold text-primary-foreground shadow-md transition hover:glow-gold"
           >
             <Phone className="h-4 w-4" />
-            Call {SITE.phoneDisplay}
+            Call {site.phoneDisplay}
           </a>
+
           <a
-            href={whatsappUrl("Hi Monara Auto Studio! I'd like to talk about my car.")}
+            href={site.whatsappUrl(
+              "Hi Monara Auto Studio! I'd like to talk about my car."
+            )}
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-2 rounded-xl border-2 border-white/80 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white hover:text-secondary"

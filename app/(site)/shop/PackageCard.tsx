@@ -2,15 +2,17 @@ import { Check, Clock, MessageCircle } from "lucide-react";
 
 import { formatKES } from "@/lib/types";
 import type { Package } from "@/lib/types";
-import { whatsappUrl } from "@/lib/site";
+import { getSite } from "@/lib/getSite";
 
 // Draws ONE package card. Receives a single `pkg` (shaped by the Package type).
 interface PackageCardProps {
   pkg: Package;
 }
 
-const PackageCard = ({ pkg }: PackageCardProps) => {
+const PackageCard = async ({ pkg }: PackageCardProps) => {
   // How much the customer saves, if there is an original price
+  const site = await getSite();
+
   const saving = pkg.originalPrice ? pkg.originalPrice - pkg.price : 0;
 
   const message = `Hi Monara, I'd like to book the ${pkg.name} package (${formatKES(pkg.price)}).`;
@@ -75,7 +77,7 @@ const PackageCard = ({ pkg }: PackageCardProps) => {
       {/* Button (pinned to the bottom of the card) */}
       <div className="mt-auto pt-6">
         <a
-          href={whatsappUrl(message)}
+          href={site.whatsappUrl(message)}
           target="_blank"
           rel="noreferrer"
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-gold-gradient px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:glow-gold"

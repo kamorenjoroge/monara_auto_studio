@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Clock, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 
 import { getServices } from "@/lib/api";
-import { phoneUrl, whatsappUrl, SITE } from "@/lib/site";
+import { getSite } from "@/lib/getSite";
 import ContactForm from "./ContactForm";
 
 export const metadata: Metadata = {
@@ -11,41 +11,38 @@ export const metadata: Metadata = {
     "Call, WhatsApp, email or visit Monara Auto Studio in Nairobi. We respond fast during opening hours.",
 };
 
-const hours = [
-  { days: "Monday – Friday", time: "8:00 AM – 6:00 PM" },
-  { days: "Saturday", time: "9:00 AM – 5:00 PM" },
-  { days: "Sunday", time: "10:00 AM – 3:00 PM" },
-];
-
 export default async function ContactPage() {
   // The form's "What do you need?" dropdown uses our service names
   const services = await getServices();
   const serviceNames = services.map((service) => service.title);
+
+  // The contact details, hours and links come from the database (Settings page)
+  const site = await getSite();
 
   // The four small cards on the left
   const contactCards = [
     {
       icon: Phone,
       title: "Call Us",
-      text: SITE.phoneDisplay,
-      href: phoneUrl,
+      text: site.phoneDisplay,
+      href: site.phoneUrl,
     },
     {
       icon: MessageCircle,
       title: "WhatsApp",
       text: "Chat with us instantly",
-      href: whatsappUrl("Hi Monara Auto Studio! I'd like to chat about my car."),
+      href: site.whatsappUrl("Hi Monara Auto Studio! I'd like to chat about my car."),
     },
     {
       icon: Mail,
       title: "Email",
-      text: SITE.email,
-      href: `mailto:${SITE.email}`,
+      text: site.email,
+      href: `mailto:${site.email}`,
     },
     {
       icon: MapPin,
       title: "Visit the Studio",
-      text: SITE.address,
+      text: site.address,
       href: undefined, // not a link, just text
     },
   ];
@@ -119,7 +116,7 @@ export default async function ContactPage() {
                 })}
               </div>
 
-              {/* Opening hours */}
+              {/* Opening hours (from the database) */}
               <div className="rounded-2xl border border-border bg-card p-5">
                 <div className="flex items-center gap-2">
                   <Clock className="h-5 w-5 text-primary-dark" />
@@ -128,7 +125,7 @@ export default async function ContactPage() {
                   </h2>
                 </div>
                 <dl className="mt-4 divide-y divide-border text-sm">
-                  {hours.map((row) => (
+                  {site.hours.map((row) => (
                     <div key={row.days} className="flex justify-between gap-4 py-3">
                       <dt className="text-muted-foreground">{row.days}</dt>
                       <dd className="font-semibold text-foreground">{row.time}</dd>

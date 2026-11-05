@@ -11,20 +11,26 @@ export default function LoginPage() {
   const router = useRouter();
   const { user, loading, login } = useAuth();
 
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   // Already logged in? Go straight to the dashboard.
   useEffect(() => {
     if (!loading && user) router.replace("/admin");
   }, [loading, user, router]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); // stop the page from reloading
+    setError("");
+    setSubmitting(true);
 
-    if (!login(username, password)) {
-      setError("Wrong username or password.");
+    const message = await login(email.trim(), password);
+
+    setSubmitting(false);
+    if (message) {
+      setError(message);
       return;
     }
 
@@ -52,15 +58,16 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
-            <label htmlFor="username" className="mb-1 block text-xs font-semibold text-muted-foreground">
-              Username
+            <label htmlFor="email" className="mb-1 block text-xs font-semibold text-muted-foreground">
+              Email
             </label>
             <input
-              id="username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoComplete="username"
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
               className={inputClass}
             />
           </div>
@@ -75,6 +82,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
+              required
               className={inputClass}
             />
           </div>
@@ -83,10 +91,11 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gold-gradient px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:glow-gold"
+            disabled={submitting}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gold-gradient px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:glow-gold disabled:cursor-not-allowed disabled:opacity-60"
           >
             <LogIn className="h-4 w-4" />
-            Log in
+            {submitting ? "Logging in..." : "Log in"}
           </button>
         </form>
       </div>

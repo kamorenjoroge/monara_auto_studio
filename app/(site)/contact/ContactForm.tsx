@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { MessageCircle, Send } from "lucide-react";
-
-import { whatsappUrl } from "@/lib/site";
+import { useSite } from "./../components/SiteProvider"
 
 // Shared look for every input box
 const inputClass =
@@ -22,6 +21,8 @@ const ContactForm = ({ services }: ContactFormProps) => {
     service: "",
     message: "",
   });
+
+   const site = useSite();
   // Error messages to show under the boxes
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -67,7 +68,7 @@ const ContactForm = ({ services }: ContactFormProps) => {
       .join("\n");
 
     // Open WhatsApp with the message ready to send
-    window.open(whatsappUrl(message), "_blank");
+    window.open(site.whatsappUrl(message), "_blank");
   };
 
   return (
