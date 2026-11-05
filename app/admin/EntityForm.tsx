@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { Plus, X } from "lucide-react";
 
@@ -8,7 +8,7 @@ import { Plus, X } from "lucide-react";
 // A REUSABLE FORM for every "add" and "edit" page.
 // You describe the fields in a list (FieldConfig[]) and this form draws them,
 // checks them, and gives you the values when the user presses the button.
-// Cars use it now. Services, packages and products will use it too.
+// Cars, services and settings use it. Packages and products will use it too.
 // ============================================================
 
 export type FieldType = "text" | "number" | "textarea" | "select" | "checkbox" | "images" | "list";
@@ -24,6 +24,8 @@ export interface FieldConfig {
   min?: number; // for "number": smallest allowed value
   max?: number; // for "number": biggest allowed value
   wide?: boolean; // take the full width (textarea, images and list are always wide)
+  section?: string; // draws a heading ABOVE this field, to start a new group
+  validate?: (value: string) => string | null; // extra check for text boxes: return a message if wrong
 }
 
 // Text, number and select values are kept as text. Images and list are lists of text. Checkbox is true/false.
@@ -224,6 +226,15 @@ const EntityForm = ({ fields, initialValues, submitLabel, cancelHref, onSubmit }
         continue;
       }
 
+      // The field's own extra check (for example "is this an email?")
+      if (field.validate && text !== "") {
+        const message = field.validate(text);
+        if (message) {
+          newErrors[field.name] = message;
+          continue;
+        }
+      }
+
       if (field.type === "number" && text !== "") {
         const number = Number(text);
         if (Number.isNaN(number)) newErrors[field.name] = "Enter a number.";
@@ -343,24 +354,35 @@ const EntityForm = ({ fields, initialValues, submitLabel, cancelHref, onSubmit }
             field.type === "checkbox";
 
           return (
-            <div key={field.name} className={isWide ? "sm:col-span-2" : ""}>
-              {/* A checkbox draws its own label */}
-              {field.type !== "checkbox" && (
-                <label htmlFor={field.name} className="mb-1.5 block text-sm font-semibold text-foreground">
-                  {field.label}
-                  {field.required && <span className="text-secondary"> *</span>}
-                </label>
+            <Fragment key={field.name}>
+              {/* A heading that starts a new group of fields */}
+              {field.section && (
+                <div className="border-b border-border pb-2 pt-3 sm:col-span-2">
+                  <h2 className="font-heading text-sm font-bold uppercase tracking-wider text-foreground">
+                    {field.section}
+                  </h2>
+                </div>
               )}
 
-              {renderControl(field)}
+              <div className={isWide ? "sm:col-span-2" : ""}>
+                {/* A checkbox draws its own label */}
+                {field.type !== "checkbox" && (
+                  <label htmlFor={field.name} className="mb-1.5 block text-sm font-semibold text-foreground">
+                    {field.label}
+                    {field.required && <span className="text-secondary"> *</span>}
+                  </label>
+                )}
 
-              {field.help && !errors[field.name] && (
-                <p className="mt-1.5 text-xs text-muted-foreground">{field.help}</p>
-              )}
-              {errors[field.name] && (
-                <p className="mt-1.5 text-xs text-destructive">{errors[field.name]}</p>
-              )}
-            </div>
+                {renderControl(field)}
+
+                {field.help && !errors[field.name] && (
+                  <p className="mt-1.5 text-xs text-muted-foreground">{field.help}</p>
+                )}
+                {errors[field.name] && (
+                  <p className="mt-1.5 text-xs text-destructive">{errors[field.name]}</p>
+                )}
+              </div>
+            </Fragment>
           );
         })}
       </div>
